@@ -7,7 +7,7 @@ Gem::Specification.new do |s|
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["Steve Hodgkiss"]
   s.email       = ["steve@hodgkiss.me.uk"]
-  s.homepage    = ""
+  s.homepage    = "https://github.com/stevehodgkiss/validation-scopes"
   s.summary     = %q{Scope ActiveModel validations}
   s.description = %q{Scope ActiveModel validations}
 
