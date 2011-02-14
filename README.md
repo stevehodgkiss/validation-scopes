@@ -18,6 +18,8 @@ Validation Scopes allows you to group validations together that share the same c
         end
       end
     end
+
+The options passed into the validation_scope method will usually be either :if or :unless, but any are accepted and they are passed onto the individual validators.
     
 # Installation
 
