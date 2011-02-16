@@ -31,7 +31,7 @@ It will be included into ActiveRecord::Base if it is defined, if not use `includ
 
 # ActiveSupport alternative
 
-ActiveSupport has an OptionMerger class for achieving the same thing generically and can be used anywhere (I noticed this after I wrote this gem). The only downside is that it will not merge option values into an array. In the example below the :if Proc on the `validates_inclusion_of` line would take precedence over the one defined on the `with_options` line.
+ActiveSupport has an OptionMerger class for achieving the same thing generically and can be used anywhere (I noticed this after I wrote this gem). The only downside is that it will not merge option values into an array. In the example below the :if Proc on the `validates_inclusion_of` line would take precedence over the one defined on the `with_options` line. See the source code for [with_options](https://github.com/rails/rails/blob/master/activesupport/lib/active_support/core_ext/object/with_options.rb) for more details.
 
     class Car < ActiveRecord::Base
       with_options :if => Proc.new { |u| u.step == 2 } do |v|
