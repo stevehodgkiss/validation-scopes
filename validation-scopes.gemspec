@@ -3,7 +3,7 @@ $:.push File.expand_path("../lib", __FILE__)
 
 Gem::Specification.new do |s|
   s.name        = "validation-scopes"
-  s.version     = "0.0.3"
+  s.version     = "0.4.0"
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["Steve Hodgkiss"]
   s.email       = ["steve@hodgkiss.me.uk"]
