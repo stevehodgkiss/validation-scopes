@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'active_model'
 
 class TestUser
   include ActiveModel::Validations
@@ -13,35 +14,113 @@ class TestUser
   def step_2?
     step == 2
   end
-end
-
-class TestValidator < ActiveModel::EachValidator
-  attr_accessor :options
   
-  def initialize(options)
-    @options = options
-    super(options)
-  end
+  protected
   
-  def validate(record)
-    
+  def self.method_with_options(options)
+    options
   end
 end
 
-describe ".validation_scope" do
+describe ValidationScopes do
+  
+  before do
+    TestClass = Class.new do
+      include ValidationScopes
+      
+      def self.method_with_options(options)
+        options
+      end
+      
+      def self.method_with_multiple_options(*options)
+        options
+      end
+    end
+  end
+  
+  it "merges method no options" do
+    TestClass.class_eval do
+      validation_scope :if => 1 do |v|
+        v.method_with_options.should == {:if => 1}
+      end
+    end
+  end
+  
+  it "merges method with options" do
+    TestClass.class_eval do
+      validation_scope :if => 1 do |v|
+        v.method_with_options(:if => 2).should == {:if => [2, 1]}
+      end
+    end
+  end
+  
+  it "merges with multiple options" do
+    TestClass.class_eval do
+      validation_scope :if => 1 do |v|
+        v.method_with_multiple_options(:name, :if => 2).should == [:name, {:if => [2, 1]}]
+      end
+    end
+  end
+  
+  it "merges nested scope with no method options" do
+    TestClass.class_eval do
+      validation_scope :if => 1 do |v|
+        v.validation_scope :if => 2 do |s|
+          s.method_with_options.should == {:if => [2, 1]}
+        end
+      end
+    end
+  end
+  
+  it "merges nested scope with method options" do
+    TestClass.class_eval do
+      validation_scope :if => 1 do |v|
+        v.validation_scope :if => 2 do |s|
+          s.method_with_options(:if => 3, :unless => 6).should == {:if => [3, 2, 1], :unless => 6}
+        end
+      end
+    end
+  end
+  
+  it "merges deep nested scope with method options" do
+    TestClass.class_eval do
+      validation_scope :if => 1 do |v|
+        v.validation_scope :if => 2 do |s|
+          s.validation_scope :unless => 6 do |u|
+            u.method_with_options(:if => 3).should == {:if => [3, 2, 1], :unless => 6}
+          end
+        end
+      end
+    end
+  end
+  
+  it "fails if called without a block parameter" do
+    expect {
+      TestClass.class_eval do
+        validation_scope :if => 1 do
+        
+        end
+      end
+    }.to raise_error
+  end
+  
+  after { Object.send(:remove_const, :TestClass) }
+end
+
+describe ValidationScopes, "with AM" do
   
   context "validates_with" do
     before do
       User = Class.new(TestUser) do
         validates_presence_of :address
-        validation_scope :if => :step_2? do
-          validates_presence_of :name
+        validation_scope :if => :step_2? do |v|
+          v.validates_presence_of :name
         end
-        validation_scope :if => Proc.new { |u| u.step == 3 } do
-          validation_scope :if => Proc.new { |u| !u.height.nil? && u.height > 6 } do
-            validates_presence_of :weight
+        validation_scope :if => Proc.new { |u| u.step == 3 } do |v|
+          v.validation_scope :if => Proc.new { |u| !u.height.nil? && u.height > 6 } do |h|
+            h.validates_presence_of :weight
           end
-          validates_inclusion_of :eye_colour, :in => ["blue", "brown"], :if => Proc.new { |u| !u.age.nil? && u.age > 20 }
+          v.validates_inclusion_of :eye_colour, :in => ["blue", "brown"], :if => Proc.new { |u| !u.age.nil? && u.age > 20 }
         end
       end
       @user = User.new
@@ -86,66 +165,7 @@ describe ".validation_scope" do
         u.errors[:weight].should be
       end
     end
-    
-    it "calls validates_with with merged scope options" do
-      presence_validator = User.validators_on(:name).first
-      presence_validator.options.should eq({:if => :step_2?})
-    end
   end
   
-  context "validate method" do
-    before do
-      User = Class.new(TestUser) do
-        validation_scope :unless => :step_2? do
-          validate do
-            errors.add(:weight, "Must be greater than 0") unless !@weight.nil? && @weight > 0
-          end
-        end
-      end
-    end
-    
-    it "should only validate weight on step 2" do
-      user = User.new
-      user.weight = 0
-      user.should be_invalid
-      user.weight = 1
-      user.should be_valid
-      
-      user.step = 2
-      user.weight = 0
-      user.should be_valid
-    end
-  end
-  
-  context "custom validators" do
-    before do
-      User = Class.new(TestUser) do
-        validation_scope :unless => :step_2?, :some_config_var => 5 do
-          validates_with TestValidator, {:attributes => [:name], :some_config_var => 6}
-          validation_scope :unless => Proc.new { |u| u.step == 3 } do
-            validates_with TestValidator, {:attributes => [:weight], :some_config_var => 7}
-          end
-        end
-      end
-      @validator = User.validators_on(:name).first
-    end
-    
-    it "passes the options in" do
-      @validator.options[:unless].should eq(:step_2?)
-      @validator.options[:some_config_var].should be
-    end
-    
-    it "turns the duplicate options into an array" do
-      @validator.options[:some_config_var].should eq([6, 5])
-    end
-    
-    it "works for nested scopes" do
-      option = User.validators_on(:weight).first.options[:unless]
-      option.size.should eq(2)
-      option[0].should eq(:step_2?)
-      option[1].should be_an_instance_of(Proc)
-    end
-  end
-  
-  after { Object.send(:remove_const, :User) if defined?(User) }
+  after { Object.send(:remove_const, :User) }
 end

@@ -28,5 +28,6 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  activemodel
   rspec
   validation-scopes!
