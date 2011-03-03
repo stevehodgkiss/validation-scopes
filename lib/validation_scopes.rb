@@ -7,16 +7,18 @@ module ValidationScopes
   module ClassMethods
 
     def validation_scope(options, &block)
-      @_in_validation_scope = true
-      @_validation_scope_options = options
+      @_nested_level_count ||= 0
+      @_validation_scope_options ||= {}
+      parent_options = @_validation_scope_options[@_nested_level_count]
+      @_nested_level_count += 1
+      @_validation_scope_options[@_nested_level_count] = parent_options.nil? ? options : merge_options(parent_options.dup, options)
       block.call
-      @_validation_scope_options = nil
-      @_in_validation_scope = false
+      @_nested_level_count -= 1
       @_handled_by_with = false
     end
     
     def validates_with(*args, &block)
-      if @_in_validation_scope
+      if in_validation_scope?
         merge_args(args)
         @_handled_by_with = true
       end
@@ -24,30 +26,42 @@ module ValidationScopes
     end
     
     def validate(*args, &block)
-      if @_in_validation_scope & !@_handled_by_with
+      if in_validation_scope? & !@_handled_by_with
         merge_args(args)
       end
+      @_handled_by_with = false
       super(*args, &block)
     end
     
-    protected
+    private
+    
+    def in_validation_scope?
+      !@_nested_level_count.nil? && @_nested_level_count > 0
+    end
     
     def merge_args(args)
       if args.empty?
-        args << @_validation_scope_options.dup
+        args << @_validation_scope_options[@_nested_level_count].dup
       elsif args.last.is_a?(Hash) && args.last.extractable_options?
         options = args.extract_options!
         options = options.dup
-        @_validation_scope_options.each_key do |key|
-          if options[key].nil?
-            options[key] = @_validation_scope_options[key]
-          else
-            options[key] = Array.wrap(options[key])
-            options[key] << @_validation_scope_options[key]
-          end
-        end
+        merge_options(options, @_validation_scope_options[@_nested_level_count])
         args << options
       end
+    end
+    
+    def merge_options(options_a, options_b)
+      return options_b if options_a.nil?
+      options_a = options_a
+      options_b.each_key do |key|
+        if options_a[key].nil?
+          options_a[key] = options_b[key]
+        else
+          options_a[key] = Array.wrap(options_a[key]) unless options_a[key].is_a?(Array)
+          options_a[key] << options_b[key]
+        end
+      end
+      options_a
     end
   end
 end

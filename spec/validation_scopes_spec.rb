@@ -38,6 +38,9 @@ describe ".validation_scope" do
           validates_presence_of :name
         end
         validation_scope :if => Proc.new { |u| u.step == 3 } do
+          validation_scope :if => Proc.new { |u| !u.height.nil? && u.height > 6 } do
+            validates_presence_of :weight
+          end
           validates_inclusion_of :eye_colour, :in => ["blue", "brown"], :if => Proc.new { |u| !u.age.nil? && u.age > 20 }
         end
       end
@@ -47,25 +50,41 @@ describe ".validation_scope" do
     end
     
     it "should only validate name when on step 2" do
-      @user.name = nil
-      @user.should be_valid
-      @user.step = 2
-      @user.should be_invalid
-      @user.name = "Steve"
-      @user.should be_valid
+      @user.tap do |u|
+        u.name = nil
+        u.should be_valid
+        u.step = 2
+        u.should be_invalid
+        u.name = "Steve"
+        u.should be_valid
+      end
     end
     
     it "only validates eye colour when on step 3 and age is above 20" do
-      @user.eye_colour = nil
-      @user.should be_valid
-      @user.age = 20
-      @user.step = 3
-      @user.eye_colour = "red"
-      @user.should be_valid
-      @user.age = 21
-      @user.should be_invalid
-      @user.eye_colour = "blue"
-      @user.should be_valid
+      @user.tap do |u|
+        u.eye_colour = "red"
+        u.should be_valid
+        u.age = 20
+        u.step = 3
+        u.should be_valid
+        u.age = 21
+        u.valid?
+        u.should be_invalid
+        u.eye_colour = "blue"
+        u.should be_valid
+      end
+    end
+    
+    it "allows nesting of scopes" do
+      @user.tap do |u|
+        u.weight = nil
+        u.should be_valid
+        u.height = 7
+        u.should be_valid
+        u.step = 3
+        u.should be_invalid
+        u.errors[:weight].should be
+      end
     end
     
     it "calls validates_with with merged scope options" do
@@ -103,6 +122,9 @@ describe ".validation_scope" do
       User = Class.new(TestUser) do
         validation_scope :unless => :step_2?, :some_config_var => 5 do
           validates_with TestValidator, {:attributes => [:name], :some_config_var => 6}
+          validation_scope :unless => Proc.new { |u| u.step == 3 } do
+            validates_with TestValidator, {:attributes => [:weight], :some_config_var => 7}
+          end
         end
       end
       @validator = User.validators_on(:name).first
@@ -115,6 +137,13 @@ describe ".validation_scope" do
     
     it "turns the duplicate options into an array" do
       @validator.options[:some_config_var].should eq([6, 5])
+    end
+    
+    it "works for nested scopes" do
+      option = User.validators_on(:weight).first.options[:unless]
+      option.size.should eq(2)
+      option[0].should eq(:step_2?)
+      option[1].should be_an_instance_of(Proc)
     end
   end
   
